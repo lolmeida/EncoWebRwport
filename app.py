@@ -10,285 +10,33 @@ import streamlit as st
 
 # -------------------------------------------------------------------------------
 st.set_page_config(page_title="ENCO Monthly Report", layout="wide")
-#@st.cache
-
-
-def get_users_dict():
-    '''Get users as a Dictionary'''
-    users = pd.read_csv('users.txt')
-    users_dict = {}
-    for i in range(users.shape[0]):
-        users_dict [str(users.iloc[i,0])] = users.iloc[i,1]
-    return users_dict
-
-def _criar_conecao_primavera():
-    '''Create connection to Primavera Database'''
-    server = r"ENCO-SRV02/PRIMAVERAV9"
-    database = "PRIENCO"
-    username = "SA"
-    password = "Enco#2016"
-    driver = "SQL Server"
-    # =================================================================================
-    string_connexao = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={username};PWD={password}"
-    return string_connexao
-
-
-_string_connexao = _criar_conecao_primavera()
-
-_my_file = "dadosRelatorioGestao.xlsm"
-
-
-def _parteDecimal(numero):
-    t = str(numero).replace(",", ".")
-    decimal = t.find(".")
-    if decimal == -1:
-        return ".00"
-    else:
-        decimal = t[decimal:]
-        larg = len(decimal)
-
-        if larg >= 3:
-            return decimal[0:3]
-        elif larg == 2:
-            return decimal + "0"
-        elif larg == 1:
-            return decimal + "00"
-        else:
-            return ".00"
-
-
-# =================================================================================
-def _parteInteira(numero):
-    t = str(numero).replace(",", ".")
-    decimal = t.find(".")
-    x = len(t) if decimal == -1 else decimal
-    #v = t[0:x]
-    res = ""
-    pos = 0
-    for i in range(x, 0, -1):
-        if pos % 3 == 0:
-            res = "." + res
-        res = t[i - 1] + res
-        pos = pos + 1
-    return res.replace("-.", "-")
-
-
-# =================================================================================
-def formatarNumeros(numero):
-    num = str(_parteInteira(numero)) + str(_parteDecimal(numero))
-    res = num.replace("..", ",")
-    return None if numero in ("", "0") else res
-
-
-# =================================================================================
-def formatarNumerosInt(numero):
-    res = str(_parteInteira(numero))
-    return None if numero in ("", "0") else res[:-1]
-
-
-# =================================================================================
-def formatarNumerosPerc(valor):
-    numero = valor * 100
-    num = str(_parteInteira(numero)) + str(_parteDecimal(numero))
-    res = num.replace("..", ",")
-    return None if numero in ("", "0") else res + "%"
-
-
-# =================================================================================
-def get_orc_mapa():
-    df = (
-        pd.read_excel(_my_file, sheet_name="pyConfig", index_col=None, usecols="A:F")
-        .fillna("")
-        .reset_index(drop=True)
-    )
-    orc_mapa = df[df["Orcamento"] == True].reset_index(drop=True)["Mapa"].tolist()
-    return orc_mapa
-
-
-def getCriterios():
-    xls = {}
-    with pd.ExcelFile(_my_file) as f:
-        xls["pyConfig"] = pd.read_excel(f, "pyConfig", index_col=None)
-        data = xls["pyConfig"]
-        crit = data[["Nome", "Valor"]].dropna().reset_index(drop=True)
-        criterios = {}
-        for i in range(crit.shape[0]):
-            criterios[crit.loc[i][0]] = crit.loc[i][1]
-    return criterios
-
-_criterios = getCriterios()
-msf = _criterios["MesFim"]
-ano = _criterios["AnoAct"]
-AnoAct = _criterios["AnoAct"]
-AnoAnt = _criterios["AnoAnt"]
-cambioAnt = _criterios["CambioAnt"]
-cambioAct = _criterios["CambioAct"]
-_PerAbrev = _criterios["PerAbrev"]
-_tipo_prod = {
-    "30126": ["Jet-A1", "Combustíveis"],
-    "30170": ["Outros acessórios", "Outros"],
-    "30110": ["Gás butano", "Outros"],
-    "30137": ["Petróleo", "Combustíveis"],
-    "30133": ["Gasolina", "Combustíveis"],
-    "30144": ["Gasóleo", "Combustíveis"],
-    "30150": ["Lubrificantes", "Outros"],
-}
-
-def _getFindReplace():
-    dados = {}
-    cbl_rep_val = pd.read_excel(
-        _my_file, sheet_name="pyData", usecols="V,C:P", header=0, converters=fmt_cbl
-    )
-    gcp_rep_val = pd.read_excel(
-        _my_file,
-        sheet_name="pyMercadorias",
-        usecols="M, C:K",
-        header=0,
-        converters=fmt_gcp,
-    )
-    cbl_rep_val = cbl_rep_val[cbl_rep_val["Marks"].str.len() > 0].reset_index(drop=True)
-    gcp_rep_val = gcp_rep_val[gcp_rep_val["Marks"].str.len() > 0].reset_index(drop=True)
-
-    dar = [cbl_rep_val, gcp_rep_val]
-    for y in range(2):
-        da = dar[y]
-        cols = da.columns
-        nu_lins, nu_cols = da.shape
-        # ------------------------------------------------------------------
-        for x in range(nu_lins):
-            for i in range(nu_cols - 1):
-                codigo = f"{da.loc[x][nu_cols-1]}_{cols[i]}".upper()
-                valor = da.loc[x][i]
-                dados[codigo] = valor
-    # -----------------------------------------------------------------
-    # find_replace = dfc[["Find", "Replace"]]
-    # da = find_replace[find_replace["Find"].str.len() > 0].reset_index(drop=True)
-    # cols = da.columns
-    # nu_lins, nu_cols = da.shape
-    # for i in range(nu_lins - 1):
-    #    codigo = da.loc[i][0]
-    #    valor = da.loc[i][1]
-    #    dados[codigo] = valor
-    # -------------------------------------------------------------
-    for z in _criterios.keys():
-        dados[z.upper()] = _criterios[z]
-    return dados
-
-def get_ProfitsAndLosts():
-    return pd.read_excel(_my_file, sheet_name="pyCustosPreveitos", skiprows=1, )
-
-# --------------------------------------------------------------------------------
-grupo_de_contas = {
-    #'1':'Capitais Permanentes',
-    '2':'Valores Imobilizados',
-    '3': 'Mercadorias',
-    #'4': 'Terciros',
-    '5':'Disponibilidades',
-    '6': 'Custos e Perdas',
-    '7': 'Proveitos e Ganhos'
-}
-
-def getTxt():
-    find_replace = _getFindReplace()
-    dft = pd.read_excel(_my_file, sheet_name="pyReportText").fillna("")
-    texto_antes = dft["TextoAntes"]
-    texto_depois = dft["TextoDepois"]
-    lins= dft.shape[0]
-    for n in range(lins):
-        texto_antes = dft["TextoAntes"][n]
-        texto_depois = dft["TextoDepois"][n]
-        for i in find_replace.keys():
-            texto_antes = texto_antes.replace(i, str(find_replace[i]))
-            texto_depois = texto_depois.replace(i, str(find_replace[i]))
-        dft["TextoAntes"][n] = texto_antes.strip()
-        dft["TextoDepois"][n] = texto_depois.strip()
-    return dft
-
-# ----------------------------------------------------------------------------
-fmt_gcp = {
-    "AnoAntStd": formatarNumeros,
-    "AnoActStd": formatarNumeros,
-    "AnoAntUsd": formatarNumeros,
-    "AnoActUsd": formatarNumeros,
-    "QtdAnt": formatarNumerosInt,
-    "QtdAct": formatarNumerosInt,
-    "VarStd": formatarNumerosPerc,
-    "VarUsd": formatarNumerosPerc,
-    "VarQtd": formatarNumerosPerc,
-}
-
-fmt_cbl = {
-    "AnoAntStd": formatarNumeros,
-    "AnoActStd": formatarNumeros,
-    "OrcStd": formatarNumeros,
-    "AnoAntUsd": formatarNumeros,
-    "AnoActUsd": formatarNumeros,
-    "OrcUsd": formatarNumeros,
-    "VarStd": formatarNumerosPerc,
-    "VarOrcStd": formatarNumerosPerc,
-    "PerStd": formatarNumerosPerc,
-    "ExtStd": formatarNumerosPerc,
-    "VarUsd": formatarNumerosPerc,
-    "VarOrcUsd": formatarNumerosPerc,
-    "PerUsd": formatarNumerosPerc,
-    "ExtUsd": formatarNumerosPerc,
-}
-
-def get_xls_data(id_src=0, formated=True):
-    """
-    {0:'cbl', 1:'gcp'}
-    """
-    sheet_name = ["pyData", "pyMercadorias"]
-    usecols = ["A:P, T:V, Y:AB", "B:P"]
-    converters = [fmt_cbl, fmt_gcp] if formated else [{"a": ""}, {"a": ""}]
-    sort_values = [["PrintOrder", "NewSort"], ["PrintOrder"]]
-
-    
-
-    
-    df = pd.read_excel(
-        _my_file,
-        sheet_name=sheet_name[id_src],
-        usecols=usecols[id_src],
-        header=0,
-        converters=converters[id_src],
-    ).sort_values(sort_values[id_src], ignore_index=True)
-    df["Descriçao"] = df["Descriçao"].str.capitalize()
-    df = df [df["Ocultar"] == False].fillna('')
-    marks =  [df[(df["Marks"] == "") &  (df["AnoActStd"] != "")
-            & (df["AnoActStd"] != 0)
-            & (df["Descriçao"] != "Total")], df[(df["Marks"] != "") ]]
-    if formated == True:
-        return df
-    else:
-        df = marks[id_src]
-        return df
+@st.cache
 def getData():
     gcp = (
-        get_xls_data(id_src=1, formated=True).dropna().reset_index(drop=True)
+        data.get_xls_data(id_src=1, formated=True).dropna().reset_index(drop=True)
     )  
     cbl = (
-        get_xls_data(id_src=0, formated=True).dropna().reset_index(drop=True)
+        data.get_xls_data(id_src=0, formated=True).dropna().reset_index(drop=True)
     )  
 
     grf_gcp = (
-        get_xls_data(id_src=1, formated=False).dropna().reset_index(drop=True)
+        data.get_xls_data(id_src=1, formated=False).dropna().reset_index(drop=True)
     )
 
     grf_cbl = (
-        get_xls_data(id_src=0, formated=False).dropna().reset_index(drop=True)
+        data.get_xls_data(id_src=0, formated=False).dropna().reset_index(drop=True)
     )
-    crit = getCriterios()
-    txt = getTxt()
-    orc_mapa = get_orc_mapa()
-    #rhp = get_Rhp()
-    profits_losts = get_ProfitsAndLosts() 
-    users = get_users_dict()
+    crit = data.getCriterios()
+    txt = data.getTxt()
+    orc_mapa = data.get_orc_mapa()
+    #rhp = data.get_Rhp()
+    profits_losts = data.get_ProfitsAndLosts() 
+    users = data.get_users_dict()
     
     return gcp, cbl, grf_gcp, grf_cbl, crit, txt, orc_mapa, profits_losts,users
 gcp, cbl, grf_gcp, grf_cbl, crit, txt, orc_mapa, profits_losts,users = getData()
-grupo_de_contas = grupo_de_contas.values()
-cod_grp_contas = grupo_de_contas.keys()
+grupo_de_contas = data.grupo_de_contas.values()
+cod_grp_contas = data.grupo_de_contas.keys()
 
 col_esq, col_mei, col_dta = st.columns(3)
 
@@ -335,7 +83,234 @@ if user in users.keys():
             texto_report(opcao, 0)
             texto_report(opcao, 1)
         st.markdown("---")
+    # -------------------------------------------------------------------------------
+    if st.checkbox("1. Atividades"):
+        st.markdown("## Aprovisionamento e comercialização")
+        col1, col2, col3, col4 = st.columns(4)
+        opcao = col1.selectbox(
+            "Escolha uma opção vara visualizar", ("Importacao", "Vendas", "Existencias")
+        )
+        moeda = col2.selectbox("Selecione a moeda", ("Usd", "Std"))
+        tipo_dados = col3.selectbox(
+            "Escolha o tipo de visualização", ("Gráficos","Tabela")
+        )
+        #texto_report(opcao, 0)
+        if tipo_dados == "Tabela":
+            df_cols = [
+                "Descriçao",
+                "QtdAnt",
+                "QtdAct",
+                "VarQtd",
+                f"AnoAnt{moeda}",
+                f"AnoAct{moeda}",
+                f"Var{moeda}",
+            ]
+            st.markdown(f"##### {tipo_dados} de {opcao} em {moeda.upper()}".upper())
+            df = gcp[gcp["Mapa"] == opcao].reset_index(drop=True)
+            titulo_quadro(df)
+            st.table(df[df_cols].iloc[2:])
+        elif tipo_dados == "Gráficos":
+            familia = col4.selectbox("Escolha uma familia ", ("Combustíveis", "Outros"))
+            st.markdown(
+                f"##### {tipo_dados} de {opcao} de {familia} em {moeda.upper()}".upper()
+            )
+            df_grf = grf_gcp[(grf_gcp["Mapa"] == opcao) & (grf_gcp["Familia"] == familia)]
+            gcp_qtd_val = [['Descriçao','QtdAnt','QtdAct'],['Descriçao',f'AnoAnt{moeda}',f'AnoAct{moeda}']]
+            gcp_ttlo_mda = ['.',f'em {moeda.upper()}.']
+            ttlo_qtd_val = ['Quantidades de','Valor de ']
+            def grafico_gcp(id_tipo):
+                gcp_df =df_grf[gcp_qtd_val[id_tipo]]
+                gcp_df = gcp_df.rename(columns={'AnoAntStd':data.AnoAnt, 'AnoActStd':data.AnoAct,'QtdAnt':data.AnoAnt, 'QtdAct':data.AnoAct})
+                gcp_df =gcp_df.T
+                gcp_df.columns = gcp_df.iloc[0]
+                gcp_df = gcp_df[1:].reset_index()
+                y=gcp_df.columns[1:]
+                
+                for i in y:
+                    gcp_df[i] = pd.to_numeric(gcp_df[i])
+                fig = px.bar(gcp_df, x="index", y=y, title=f"{ttlo_qtd_val[id_tipo]} {opcao} de {familia} {gcp_ttlo_mda[id_tipo]}", barmode='group')
+                fig.update_traces(texttemplate='%{y:.2s}', textposition='outside')
+                fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+                return fig
+            col1, col2 = st.columns(2)
+            col1.plotly_chart(grafico_gcp(0), use_container_width=True)
+            col2.plotly_chart(grafico_gcp(1), use_container_width=True)
+            
+            
+            
+            
+            # -----------------------------------------------------------------------------
+            
+            
+            if st.checkbox("Dataframe"):
+                st.dataframe(df_grf)
+            # -----------------------------------------------------------------------------
+        else:
+            st.warning("Em construção")
+        if st.checkbox("Texto"):
+            texto_report(opcao, 0)
+            texto_report(opcao, 1)
+        st.markdown("---")
+    mapas_financ = ["Indicadores", "Balanço", "D_Resultados", "FluxoCaixa"]
+    # -------------------------------------------------------------------------------
+    if st.checkbox("2. Demonstrações financeiras"):
+        st.markdown("## Demonstrações financeiras")
+        col1, col2, col3, col4 = st.columns(4)
+        opcao = col1.selectbox("Mapa:", mapas_financ)
+        moeda = col2.selectbox("Moeda:", ("Std", "Usd"))
+        df_cols = [
+            "Descriçao",
+            "Notas",
+            f"AnoAnt{moeda}",
+            f"Var{moeda}",
+            f"AnoAct{moeda}",
+            f"VarOrc{moeda}",
+            f"Orc{moeda}",
+        ]
+        df_columns = df_cols if opcao in orc_mapa else df_cols[0:-2]
+        df = cbl.fillna("")
+        df = df[df["Mapa"] == opcao].reset_index(drop=True)
+        col3.markdown(f"#### {opcao} em {moeda.upper()}")
+        
+        
+        titulo_quadro(df)
+        st.table(df[df_columns].iloc[2:])
+
+        if st.checkbox("Descrição"):
+            texto_report(opcao, 0)
+            texto_report(opcao, 1)
+        st.markdown("---")
+    # -------------------------------------------------------------------------------
+    if st.checkbox("3. Análise das Demonstrações Financeiras"):
+        st.markdown("## Análise das Demonstrações Financeiras")
+        col1, col2, col3, col4 = st.columns(4)
+        tipo_mapa = col1.selectbox("Tipo:", tipo_mapa_cbl[1:])
+        cbl = cbl[cbl["Tipo"] == tipo_mapa]
+        cbl_mapas = cbl["Mapa"].unique().tolist()
+        mapas_aux = [x for x in cbl_mapas if x not in mapas_financ]
+        mapa = col2.selectbox("Mapa:", mapas_aux)
+        moeda = col3.selectbox("Moedas:", ("Usd", "Std"))
+        tipo_dados = col4.selectbox("Mostrar:", ("Gráfico","Tabela"))
+        #st.markdown(f"#### {mapa} em {moeda.upper()}")
+        
+        if tipo_dados == "Tabela":
+            df_cols = [
+                "Descriçao",
+                "Notas",
+                f"AnoAnt{moeda}",
+                f"Var{moeda}",
+                f"AnoAct{moeda}",
+                f"VarOrc{moeda}",
+                f"Orc{moeda}",
+            ]
+            df_columns = df_cols if mapa in orc_mapa else df_cols[0:-2]
+            df = cbl.fillna("")
+            df = df[df["Mapa"] == mapa].reset_index(drop=True)[df_columns]
+            titulo_quadro(df)
+            st.table(df.iloc[2:])
+        elif tipo_dados == "Gráfico":
+            grf_gcp = data.get_xls_data(id_src=0, formated=False).dropna().reset_index(drop=True)
+            df_grf = grf_gcp[(grf_gcp["Mapa"] == mapa)]
+            gcp_qtd_val = ['Descriçao',f'AnoAnt{moeda}',f'AnoAct{moeda}',f'Orc{moeda}']
+            gcp_ttlo_mda = f'em {moeda.upper()}.'
+
+            def grafico_gcp():
+                gcp_df =df_grf[gcp_qtd_val]
+                gcp_df = gcp_df.rename(columns={f'AnoAnt{moeda}':str(data.AnoAnt), f'AnoAct{moeda}':str(data.AnoAct), f'Orc{moeda}':f'Orçamento {data.AnoAct}'})
+                gcp_df =gcp_df.T
+                gcp_df.columns = gcp_df.iloc[0]
+                gcp_df = gcp_df[1:].reset_index()
+                y=gcp_df.columns[1:]
+
+                for i in y:
+                    gcp_df[i] = pd.to_numeric(gcp_df[i])
+                fig = px.bar(gcp_df, x="index", y=y, title=f"{mapa}  {gcp_ttlo_mda}", barmode='group')
+                fig.update_traces(texttemplate='%{y:.2s}', textposition='outside')
+                fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+                return fig
+            st.plotly_chart(grafico_gcp(), use_container_width=True)
+            
+            
+        else:
+            st.warning("Em construção")
+        if st.checkbox("Redação"):
+            texto_report(mapa, 0)
+            texto_report(mapa, 1)
+        st.markdown("---")
+
+    df_cp = profits_losts
+    df_cp = df_cp[df_cp['Ocultar'] == False]
+    lst_ctas_sel = df_cp.Cta.unique().tolist()
+    if st.checkbox("4. Análise das Contas"):
+        x1, x2, x3, x4,x5,x6 = st.columns(6)
+        rubricas = x1.selectbox('Rubricas:',grupo_de_contas)
+        id_cust_prov = ''.join([x for x,y in data.grupo_de_contas.items() if y == rubricas])
+        grupo_conta = [x for x in lst_ctas_sel if str(x).startswith(id_cust_prov)]
+        grp_contas = x2.selectbox('Grupo de Contas:',grupo_conta) #lst_ctas_sel )
+        lst_contas_sel = df_cp[df_cp['Cta'] == grp_contas].Conta.unique().tolist() 
+        contas = x3.selectbox('Contas de Movimento:',lst_contas_sel )
+
+        a, b, c = st.columns(3)
+        mes= crit['MesFim']
+        res = df_cp[df_cp['Conta'] == contas ].reset_index(drop=True)
+        tipos = res.Tipo.tolist()
+        resx = res.transpose()
+        pasta = f'pyGraphics/{resx[3:-1].iloc[0].tolist()[0]}'
+        titulo = f'{resx[0:1].iloc[0].tolist()[0]} - {resx[1:2].iloc[0].tolist()[0]}'
+        columns = resx[2:3].iloc[0].tolist()
+        result = resx[4:-1]
+        st.info(titulo)
+        chart = Line(titulo)
+        chart.set_options(labels=result.index.tolist()[:mes], x_label='Mês', y_label='STD')
+        meses = [int(x) for x in result.index.tolist()[:mes]]
+        xyz = [go.Line(name=tipos[x], x=meses, y=result[x]) for x in range(len(tipos))]
+        fig = go.Figure(data=xyz)
+        fig.update_layout(barmode='group')
+        a.plotly_chart(fig, use_container_width=True)
+        
+        grp_res = res[['Tipo','Descricao','Total']]
+        fig_res_cta = px.bar(
+        grp_res,
+        x="Tipo",
+        y= "Total",
+        text="Total",
+        orientation="v",
+        barmode='group',
+        title=f"<b>{grp_res['Descricao'][0]} (Total Acumulado)</b>",
+        color='Tipo',
+        color_continuous_scale=["red", "yellow", "green"],
+        template="plotly_white")
+        fig_res_cta.update_traces(texttemplate='%{text:.2s}', textposition='outside')
+        fig_res_cta.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+        b.plotly_chart(fig_res_cta, use_container_width=True)
+
+
+
+        raz = str(contas)[:2]
+        res_raz =df_cp[df_cp['Cta'] == int(raz) ].iloc[:-1,2:].groupby(by=['Tipo'], as_index=False).sum()#.reset_index(drop=True)
     
+        
+        fig_raz_cta = px.bar(
+        res_raz,
+        x="Tipo",
+        y= "Total",
+        text="Total",
+        orientation="v",
+        barmode='group',
+        title=f"<b>Total {rubricas}.</b>",
+        color='Tipo',
+        color_continuous_scale=["red", "yellow", "green"],
+        template="plotly_white")
+        fig_raz_cta.update_traces(texttemplate='%{text:.2s}', textposition='outside')
+        fig_raz_cta.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+        c.plotly_chart(fig_raz_cta, use_container_width=True)
+
+        st.markdown("---") 
+        if st.checkbox("Dataframe"):
+            st.dataframe(res)
+            st.dataframe(res_raz)
+
+
     # -------------------------------------------------------------------------------
     st.markdown("---")
 
@@ -348,7 +323,7 @@ hide_st_style = """
             header {visibility: hidden}
             </style>
 """
-#st.markdown(hide_st_style, unsafe_allow_html=True)
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 # if __name__ == '__main__':
 # main()
