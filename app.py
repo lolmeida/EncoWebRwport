@@ -1,6 +1,4 @@
 import datetime
-import time
-
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -31,12 +29,12 @@ def getData():
     crit = data.getCriterios()
     txt = data.getTxt()
     orc_mapa = data.get_orc_mapa()
-    rhp = data.get_Rhp()
+    #rhp = data.get_Rhp()
     profits_losts = data.get_ProfitsAndLosts() 
     users = data.get_users_dict()
     
-    return gcp, cbl, grf_gcp, grf_cbl, crit, txt, orc_mapa, rhp, profits_losts,users
-gcp, cbl, grf_gcp, grf_cbl, crit, txt, orc_mapa, rhp, profits_losts,users = getData()
+    return gcp, cbl, grf_gcp, grf_cbl, crit, txt, orc_mapa, profits_losts,users
+gcp, cbl, grf_gcp, grf_cbl, crit, txt, orc_mapa, profits_losts,users = getData()
 grupo_de_contas = data.grupo_de_contas.values()
 cod_grp_contas = data.grupo_de_contas.keys()
 
@@ -312,48 +310,6 @@ if user in users.keys():
             st.dataframe(res)
             st.dataframe(res_raz)
 
-    # -------------------------------------------------------------------------------
-    if st.checkbox("5. Recursos Humanos"):
-        st.markdown("## Recursos Humanos")
-        
-        
-        col1, col2, col3, col4 = st.columns(4)
-        ctg =col1.selectbox('Categorias',['literacia','tempo_servico','categoria'])
-        lst = ['sexo', 'idade', ctg]
-        col = lst.append('qtd')
-        facet_col = ''.join(lst[-2:-1])
-        facet_row = ''.join(lst[:1])
-        x = ''.join(lst[-3:-2])
-        rhp =rhp[lst].groupby(lst[:-1], dropna=False, as_index=False).count().sort_values(by='idade')
-        fig = px.bar(rhp, x=x, 
-                    y="qtd", 
-                    color=facet_row,
-                    barmode="group",
-                    #facet_row=facet_row, 
-                    facet_col=facet_col,
-                    )
-        st.plotly_chart(fig, use_container_width=True)
-        opcao = "txt_recursoshumanos"
-        
-        if st.checkbox("Redação RH"):
-            #st.dataframe(rhp)
-            texto_report(opcao, 0)
-            texto_report(opcao, 1)
-            #st.markdown("---")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     # -------------------------------------------------------------------------------
     st.markdown("---")
@@ -367,7 +323,7 @@ hide_st_style = """
             header {visibility: hidden}
             </style>
 """
-#st.markdown(hide_st_style, unsafe_allow_html=True)
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 # if __name__ == '__main__':
 # main()

@@ -1,53 +1,31 @@
 import numpy as np
 import pandas as pd
-import pyodbc
+#import pyodbc
 
 
 
 
 def get_users_dict():
+    '''Get users as a Dictionary'''
     users = pd.read_csv('users.txt')
     users_dict = {}
     for i in range(users.shape[0]):
         users_dict [str(users.iloc[i,0])] = users.iloc[i,1]
     return users_dict
 
-def _criarConecaoPrimavera():
-    SERVER = "ENCO-SRV02\PRIMAVERAV9"
-    DATABASE = "PRIENCO"
-    USERNAME = "SA"
-    PASSWORD = "Enco#2016"
-    DRIVER = "SQL Server"
+def _criar_conecao_primavera():
+    '''Create connection to Primavera Database'''
+    server = r"ENCO-SRV02/PRIMAVERAV9"
+    database = "PRIENCO"
+    username = "SA"
+    password = "Enco#2016"
+    driver = "SQL Server"
     # =================================================================================
-    string_connexao = "DRIVER={0};SERVER={1};DATABASE={2};UID={3};PWD={4}".format(
-        DRIVER, SERVER, DATABASE, USERNAME, PASSWORD
-    )
+    string_connexao = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={username};PWD={password}"
     return string_connexao
 
 
-_string_connexao = _criarConecaoPrimavera()
-
-
-def _selecionar(query, headers=None):
-    """
-    Seleciona dados da base de dados PRIENCO
-    Parámetros:
-    - query - > Obrigatório
-    - headers - > facultativo: Quando fornecido, retorna DataFrame
-    """
-    with pyodbc.connect(_string_connexao) as conexao:
-        cursor = conexao.cursor()
-        cursor.execute(query)
-        data = cursor.fetchall()
-    if headers == None:
-        return data
-    else:
-        res = np.array(data)
-        df = pd.DataFrame(res, columns=headers)
-        for column in df.columns:
-            df[column] = df[column].fillna(0)  # Fill NaN values with ''
-        return df
-
+_string_connexao = _criar_conecao_primavera()
 
 _my_file = "dadosRelatorioGestao.xlsm"
 
@@ -76,7 +54,7 @@ def _parteInteira(numero):
     t = str(numero).replace(",", ".")
     decimal = t.find(".")
     x = len(t) if decimal == -1 else decimal
-    v = t[0:x]
+    #v = t[0:x]
     res = ""
     pos = 0
     for i in range(x, 0, -1):
@@ -130,7 +108,6 @@ def getCriterios():
             criterios[crit.loc[i][0]] = crit.loc[i][1]
     return criterios
 
-
 _criterios = getCriterios()
 msf = _criterios["MesFim"]
 ano = _criterios["AnoAct"]
@@ -148,38 +125,6 @@ _tipo_prod = {
     "30144": ["Gasóleo", "Combustíveis"],
     "30150": ["Lubrificantes", "Outros"],
 }
-
-
-def get_Rhp():
-    # -------------------------PESSOAL---------------------------------------------------------
-    rhp = f"usp_RecursosHumanos '28-{msf}-{ano}'"
-    rhp_cols = [
-        "codigo",
-        "nome",
-        "sexo",
-        "idade",
-        "tempo_servico",
-        "anos_casa",
-        "anos_idade",
-        "literacia",
-        "categoria",
-        "qtd",
-    ]
-    return _selecionar(rhp, rhp_cols)
-
-
-def get_Exi():
-    # ----------------------------EXISTENCIAS------------------------------------------------------
-    exi = "usp_Peah_ExistenciaEmFecho"
-    exi_cols = ["ano", "mes", "data", "familia", "stock"]
-    sexi = _selecionar(exi, exi_cols)
-    sexi["artigo"] = [_tipo_prod[i][0] for i in sexi["familia"]]
-    sexi["grupo"] = [_tipo_prod[i][1] for i in sexi["familia"]]
-    sexi["mes"] = [int(i) for i in sexi["mes"]]
-    sexi = sexi[sexi["mes"] <= msf]
-    return sexi.sort_values(["grupo", "familia"])
-    # ----------------------------------------------------------------------------------
-
 
 def _getFindReplace():
     dados = {}
@@ -225,7 +170,6 @@ def get_ProfitsAndLosts():
     return pd.read_excel(_my_file, sheet_name="pyCustosPreveitos", skiprows=1, )
 
 # --------------------------------------------------------------------------------
-
 grupo_de_contas = {
     #'1':'Capitais Permanentes',
     '2':'Valores Imobilizados',
@@ -236,13 +180,12 @@ grupo_de_contas = {
     '7': 'Proveitos e Ganhos'
 }
 
-
 def getTxt():
     find_replace = _getFindReplace()
     dft = pd.read_excel(_my_file, sheet_name="pyReportText").fillna("")
     texto_antes = dft["TextoAntes"]
     texto_depois = dft["TextoDepois"]
-    lins, cols = dft.shape
+    lins= dft.shape[0]
     for n in range(lins):
         texto_antes = dft["TextoAntes"][n]
         texto_depois = dft["TextoDepois"][n]
@@ -252,7 +195,6 @@ def getTxt():
         dft["TextoAntes"][n] = texto_antes.strip()
         dft["TextoDepois"][n] = texto_depois.strip()
     return dft
-
 
 # ----------------------------------------------------------------------------
 fmt_gcp = {
@@ -284,7 +226,6 @@ fmt_cbl = {
     "ExtUsd": formatarNumerosPerc,
 }
 
-
 def get_xls_data(id_src=0, formated=True):
     """
     {0:'cbl', 1:'gcp'}
@@ -296,36 +237,7 @@ def get_xls_data(id_src=0, formated=True):
 
     
 
-    int_cbl = [
-        [
-            "AnoAntStd",
-            "VarStd",
-            "AnoActStd",
-            "VarOrcStd",
-            "OrcStd",
-            "PerStd",
-            "ExtStd",
-            "AnoAntUsd",
-            "VarUsd",
-            "AnoActUsd",
-            "VarOrcUsd",
-            "OrcUsd",
-            "PerUsd",
-            "ExtUsd",
-        ],
-        [
-            "QtdAnt",
-            "QtdAct",
-            "VarQtd",
-            "AnoAntStd",
-            "AnoActStd",
-            "VarStd",
-            "AnoAntUsd",
-            "AnoActUsd",
-            "VarUsd",
-        ],
-    ]
-
+    
     df = pd.read_excel(
         _my_file,
         sheet_name=sheet_name[id_src],
