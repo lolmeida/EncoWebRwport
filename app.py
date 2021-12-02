@@ -10,7 +10,7 @@ import streamlit as st
 
 # -------------------------------------------------------------------------------
 st.set_page_config(page_title="ENCO Monthly Report", layout="wide")
-@st.cache
+#@st.cache
 def getData():
     gcp = (
         data.get_xls_data(id_src=1, formated=True).dropna().reset_index(drop=True)
@@ -323,7 +323,7 @@ hide_st_style = """
             header {visibility: hidden}
             </style>
 """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+#st.markdown(hide_st_style, unsafe_allow_html=True)
 
 # if __name__ == '__main__':
 # main()
